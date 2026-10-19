@@ -3,4 +3,5 @@ __pycache__/
 .env
 chroma_db/
 .streamlit/secrets.toml
+.streamlit/*.toml
 my_docs/
