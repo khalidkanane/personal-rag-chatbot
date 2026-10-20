@@ -8,6 +8,7 @@ pypdf
 sentence-transformers
 flashrank
 
+docx2txt 
 
 
 

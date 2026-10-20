@@ -11,8 +11,13 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.messages import HumanMessage, AIMessage
 
+# Add Reranking
 from langchain_classic.retrievers import ContextualCompressionRetriever
 from langchain_community.document_compressors.flashrank_rerank import FlashrankRerank
+
+# Add loaders: 
+from langchain_community.document_loaders import Docx2txtLoader, TextLoader, CSVLoader
+
 
 # --- Setup Streamlit UI ---
 st.set_page_config(page_title="Personal RAG Chatbot", page_icon="📚")
@@ -23,32 +28,60 @@ groq_api_key = st.secrets["GROQ_API_KEY"]
 # --- Sidebar: Document Management ---
 with st.sidebar:
     st.header("Document Management")
-    uploaded_files = st.file_uploader("Upload PDF documents", type="pdf", accept_multiple_files=True)
     
+    # 1. Update the file uploader to accept more types
+    uploaded_files = st.file_uploader(
+        "Upload documents", 
+        type=["pdf", "docx", "txt", "csv"], 
+        accept_multiple_files=True
+    )
+    
+    # 2. Only process when the button is clicked
     if st.button("Process Documents") and uploaded_files:
         with st.spinner("Processing and indexing documents..."):
             docs = []
             for uploaded_file in uploaded_files:
+                # Get file extension
+                file_extension = uploaded_file.name.split('.')[-1].lower()
                 temp_file_path = f"./temp_{uploaded_file.name}"
+                
+                # Save the file temporarily
                 with open(temp_file_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
-                loader = PyPDFLoader(temp_file_path)
+                
+                # 3. Choose the correct loader based on the extension
+                if file_extension == "pdf":
+                    loader = PyPDFLoader(temp_file_path)
+                elif file_extension == "docx":
+                    loader = Docx2txtLoader(temp_file_path)
+                elif file_extension == "csv":
+                    loader = CSVLoader(temp_file_path)
+                elif file_extension == "txt":
+                    loader = TextLoader(temp_file_path)
+                else:
+                    st.warning(f"Unsupported file type: {file_extension}")
+                    os.remove(temp_file_path)
+                    continue
+                
+                # Load the document and clean up
                 docs.extend(loader.load())
                 os.remove(temp_file_path)
             
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-            splits = text_splitter.split_documents(docs)
-            
-            embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-            
-            if os.path.exists("./chroma_db"):
-                shutil.rmtree("./chroma_db")
+            # --- The rest of your processing logic stays the same ---
+            if docs:
+                text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+                splits = text_splitter.split_documents(docs)
                 
-            vectorstore = Chroma.from_documents(documents=splits, embedding=embeddings, persist_directory="./chroma_db")
-            st.session_state.vectorstore = vectorstore
-            st.success(f"Processed {len(splits)} chunks!")
+                embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+                
+                if os.path.exists("./chroma_db"):
+                    shutil.rmtree("./chroma_db")
+                    
+                vectorstore = Chroma.from_documents(documents=splits, embedding=embeddings, persist_directory="./chroma_db")
+                st.session_state.vectorstore = vectorstore
+                st.success(f"Processed {len(splits)} chunks from {len(uploaded_files)} files!")
 
-    # NEW: Clear Chat Button
+    # Clear Chat Button
     if st.button("Clear Chat History"):
         st.session_state.messages = []
         st.rerun()
