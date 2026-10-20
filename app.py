@@ -2,7 +2,7 @@ import streamlit as st
 import os
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEndpointEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
@@ -39,9 +39,8 @@ with st.sidebar:
             splits = text_splitter.split_documents(docs)
             
             # Create embeddings and store in Chroma
-            embeddings = HuggingFaceEndpointEmbeddings(
-                huggingfacehub_api_token=hf_token,
-                model="sentence-transformers/all-MiniLM-L6-v2"
+            embeddings = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-MiniLM-L6-v2"
             )
             
             # Delete old DB if it exists to avoid mixing documents
