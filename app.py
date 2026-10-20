@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import shutil
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -13,9 +14,9 @@ from langchain_core.output_parsers import StrOutputParser
 st.set_page_config(page_title="Personal RAG Chatbot", page_icon="📚")
 st.title("📚 Personal RAG Chatbot")
 
-# Load API keys from secrets
+# Load API key from secrets
+# Note: We no longer need the HuggingFace token because embeddings run locally!
 groq_api_key = st.secrets["GROQ_API_KEY"]
-hf_token = st.secrets["HUGGINGFACEHUB_API_TOKEN"]
 
 # --- Sidebar: Document Upload & Indexing ---
 with st.sidebar:
@@ -38,14 +39,13 @@ with st.sidebar:
             text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
             splits = text_splitter.split_documents(docs)
             
-            # Create embeddings and store in Chroma
+            # Create LOCAL embeddings (No API calls, no billing issues)
             embeddings = HuggingFaceEmbeddings(
                 model_name="sentence-transformers/all-MiniLM-L6-v2"
             )
             
             # Delete old DB if it exists to avoid mixing documents
             if os.path.exists("./chroma_db"):
-                import shutil
                 shutil.rmtree("./chroma_db")
                 
             vectorstore = Chroma.from_documents(documents=splits, embedding=embeddings, persist_directory="./chroma_db")
@@ -78,11 +78,17 @@ if prompt := st.chat_input("Ask a question about your documents..."):
         # Generate response
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
-                # Setup Retriever and LLM
+                # 1. Setup Retriever
                 retriever = st.session_state.vectorstore.as_retriever(search_kwargs={"k": 4})
-                llm = ChatGroq(temperature=0, groq_api_key=groq_api_key, model_name="llama3-8b-8192")
                 
-                # Prompt Template
+                # 2. Setup LLM (Updated to the current working Groq model)
+                llm = ChatGroq(
+                    temperature=0, 
+                    groq_api_key=groq_api_key, 
+                    model_name="openai/gpt-oss-20b"
+                )
+                
+                # 3. Prompt Template
                 template = """Answer the question based only on the following context:
                 {context}
 
@@ -92,7 +98,7 @@ if prompt := st.chat_input("Ask a question about your documents..."):
                 """
                 prompt_template = ChatPromptTemplate.from_template(template)
                 
-                # RAG Chain
+                # 4. RAG Chain
                 rag_chain = (
                     {"context": retriever, "question": RunnablePassthrough()}
                     | prompt_template
@@ -100,7 +106,7 @@ if prompt := st.chat_input("Ask a question about your documents..."):
                     | StrOutputParser()
                 )
                 
-                # Stream the answer
+                # 5. Stream the answer
                 response = st.write_stream(rag_chain.stream(prompt))
         
         # Save assistant response to history
