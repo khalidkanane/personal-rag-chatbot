@@ -11,6 +11,9 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.messages import HumanMessage, AIMessage
 
+from langchain_classic.retrievers import ContextualCompressionRetriever
+from langchain_community.document_compressors.flashrank_rerank import FlashrankRerank
+
 # --- Setup Streamlit UI ---
 st.set_page_config(page_title="Personal RAG Chatbot", page_icon="📚")
 st.title("📚 Personal RAG Chatbot")
@@ -73,6 +76,17 @@ if prompt := st.chat_input("Ask a question about your documents..."):
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 retriever = st.session_state.vectorstore.as_retriever(search_kwargs={"k": 4})
+                # Original retriever: change k from 4 to a larger number, e.g., 10
+                base_retriever = st.session_state.vectorstore.as_retriever(search_kwargs={"k": 10})
+
+                # Add Reranker
+                compressor = FlashrankRerank(top_n=3) # Only keep the 3 most relevant chunks
+                rerank_retriever = ContextualCompressionRetriever(
+                    base_compressor=compressor, 
+                    base_retriever=base_retriever
+               )
+
+# Then pass rerank_retriever into your rag_chain to replace the original retriever
                 llm = ChatGroq(temperature=0, groq_api_key=groq_api_key, model_name="openai/gpt-oss-20b")
                 
                 # NEW: Prompt Template with Chat History (Memory)
