@@ -7,7 +7,6 @@ langchain-chroma
 pypdf
 sentence-transformers
 flashrank
-
 docx2txt 
 
 

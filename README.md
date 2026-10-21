@@ -3,7 +3,7 @@
 A fully functional Retrieval-Augmented Generation (RAG) chatbot that allows you to chat with your own PDF documents. Upload a PDF, and the app will index it locally and answer your questions accurately based on the document's content.
 
 
-![alt text](image.png)
+![alt text](image-1.png)
 
 🔗 **Live Demo:** https://personal-rag-chatbot.streamlit.app/
 
